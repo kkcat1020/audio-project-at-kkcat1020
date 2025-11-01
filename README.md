@@ -1,1 +1,221 @@
-# audio-project-at-kkcat1020
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>音質カスタムステーション</title>
+<style>
+  body { font-family: sans-serif; text-align: center; padding: 20px; }
+  h1 { margin-bottom: 10px; }
+  input, select, button { margin: 5px; padding: 8px; font-size: 1em; }
+  audio { margin-top: 15px; width: 100%; }
+  hr { margin-top: 30px; }
+  #footer { text-align:center; margin-top:20px; font-family:sans-serif; }
+  #footer img { border-radius:50%; width:80px; }
+</style>
+</head>
+<body>
+<h1>🎧 音質カスタムステーション</h1>
+
+<!-- ファイルアップロード -->
+<input type="file" id="audioFile" accept="audio/*"><br>
+
+<!-- モード選択 -->
+<select id="modeSelect">
+  <option value="normal">通常</option>
+  <option value="low">音質を悪く</option>
+  <option value="radio">ラジオ風</option>
+  <option value="loud">爆音モード</option>
+</select>
+
+<!-- 強さスライダー -->
+<label>強さ: <input type="range" id="strength" min="0" max="100" value="50"></label><br>
+
+<!-- 更新ボタン -->
+<button id="updateButton">🔄 更新</button>
+<!-- 再生ボタン -->
+<button id="playButton">▶️ 再生</button>
+<!-- ダウンロード＆共有 -->
+<button id="downloadButton">💾 ダウンロード</button>
+<button id="shareButton">📤 共有</button>
+
+<!-- 再生バー -->
+<div id="playerContainer"></div>
+
+<hr>
+
+<!-- 製作者とアイコン -->
+<div id="footer">
+  <img src="https://i.ibb.co/cKFNWtj5/thinker.png" alt="考える人アイコン"><br>
+  <p>製作者: kakeru</p>
+</div>
+
+<script>
+let audioContext;
+let originalBuffer = null;
+let processedBuffer = null;
+
+// ファイル読み込み
+document.getElementById("audioFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const arrayBuffer = await file.arrayBuffer();
+  audioContext = new AudioContext();
+  originalBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  processedBuffer = originalBuffer;
+  alert("ファイルを読み込みました！");
+});
+
+// 更新（再加工）
+document.getElementById("updateButton").addEventListener("click", async () => {
+  if (!originalBuffer) {
+    alert("まず音声ファイルを読み込んでね！");
+    return;
+  }
+  const mode = document.getElementById("modeSelect").value;
+  const strength = document.getElementById("strength").value;
+  processedBuffer = await processAudio(originalBuffer, mode, strength);
+  alert("設定を反映しました！");
+});
+
+// 再生ボタン
+document.getElementById("playButton").addEventListener("click", () => {
+  if (!processedBuffer) {
+    alert("まずファイルを読み込んでください！");
+    return;
+  }
+
+  const container = document.getElementById("playerContainer");
+  container.innerHTML = ""; // 古いバー削除
+  const audio = document.createElement("audio");
+  audio.controls = true;
+  audio.src = URL.createObjectURL(audioBufferToWavBlob(processedBuffer));
+  container.appendChild(audio);
+  audio.play();
+});
+
+// ダウンロードボタン
+document.getElementById("downloadButton").addEventListener("click", () => {
+  if (!processedBuffer) {
+    alert("まだ音声がありません！");
+    return;
+  }
+  const wavBlob = audioBufferToWavBlob(processedBuffer);
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(wavBlob);
+  link.download = "processed_audio.wav";
+  link.click();
+});
+
+// 共有ボタン
+document.getElementById("shareButton").addEventListener("click", async () => {
+  if (!processedBuffer) {
+    alert("まだ音声がありません！");
+    return;
+  }
+
+  const wavBlob = audioBufferToWavBlob(processedBuffer);
+  const file = new File([wavBlob], "processed_audio.wav", { type: "audio/wav" });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    await navigator.share({
+      files: [file],
+      title: "加工した音をチェック！",
+      text: "音質をカスタムした音声だよ🎶"
+    });
+  } else {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(wavBlob);
+    link.download = "processed_audio.wav";
+    link.click();
+  }
+});
+
+// 音加工関数
+async function processAudio(buffer, mode, strength) {
+  const offline = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+  const src = offline.createBufferSource();
+  src.buffer = buffer;
+
+  let gain = offline.createGain();
+  let filter = offline.createBiquadFilter();
+
+  switch (mode) {
+    case "low":
+      filter.type = "lowpass";
+      filter.frequency.value = 1000 - strength * 8;
+      gain.gain.value = 1;
+      break;
+    case "radio":
+      filter.type = "bandpass";
+      filter.frequency.value = 2000;
+      filter.Q.value = 1 + strength / 30;
+      gain.gain.value = 1;
+      break;
+    case "loud":
+      filter.type = "highshelf";
+      filter.frequency.value = 3000;
+      filter.gain.value = 10;
+      gain.gain.value = 1 + strength / 50;
+      break;
+    default:
+      filter.type = "allpass";
+      gain.gain.value = 1;
+  }
+
+  src.connect(filter).connect(gain).connect(offline.destination);
+  src.start(0);
+  return await offline.startRendering();
+}
+
+// AudioBuffer → WAV
+function audioBufferToWavBlob(buffer) {
+  const numOfChan = buffer.numberOfChannels;
+  const length = buffer.length * numOfChan * 2 + 44;
+  const bufferArray = new ArrayBuffer(length);
+  const view = new DataView(bufferArray);
+  const channels = [];
+  const sampleRate = buffer.sampleRate;
+  let offset = 0;
+
+  writeUTFBytes(view, offset, "RIFF"); offset += 4;
+  view.setUint32(offset, 36 + buffer.length * numOfChan * 2, true); offset += 4;
+  writeUTFBytes(view, offset, "WAVE"); offset += 4;
+  writeUTFBytes(view, offset, "fmt "); offset += 4;
+  view.setUint32(offset, 16, true); offset += 4;
+  view.setUint16(offset, 1, true); offset += 2;
+  view.setUint16(offset, numOfChan, true); offset += 2;
+  view.setUint32(offset, sampleRate, true); offset += 4;
+  view.setUint32(offset, sampleRate * 2 * numOfChan, true); offset += 4;
+  view.setUint16(offset, numOfChan * 2, true); offset += 2;
+  view.setUint16(offset, 16, true); offset += 2;
+  writeUTFBytes(view, offset, "data"); offset += 4;
+  view.setUint32(offset, buffer.length * numOfChan * 2, true); offset += 4;
+
+  for (let i = 0; i < numOfChan; i++) channels.push(buffer.getChannelData(i));
+  let interleaved = interleave(channels[0], channels[1] || channels[0]);
+  for (let i = 0; i < interleaved.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, interleaved[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return new Blob([view], { type: "audio/wav" });
+
+  function interleave(inputL, inputR) {
+    const length = inputL.length + inputR.length;
+    const result = new Float32Array(length);
+    let index = 0, inputIndex = 0;
+    while (index < length) {
+      result[index++] = inputL[inputIndex];
+      result[index++] = inputR[inputIndex++];
+    }
+    return result;
+  }
+
+  function writeUTFBytes(view, offset, string) {
+    for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+</script>
+</body>
+</html>

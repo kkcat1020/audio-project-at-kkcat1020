@@ -15,7 +15,7 @@
 </style>
 </head>
 <body>
-<h1>🎧 音質カスタムステーション</h1>
+<h1>音質カスタムステーション</h1>
 
 <!-- ファイルアップロード -->
 <input type="file" id="audioFile" accept="audio/*"><br>
@@ -23,9 +23,9 @@
 <!-- モード選択 -->
 <select id="modeSelect">
   <option value="normal">通常</option>
-  <option value="low">音質を悪く</option>
-  <option value="radio">ラジオ風</option>
-  <option value="loud">爆音モード</option>
+  <option value="low">音質老化</option>
+  <option value="radio">ノイズ（ラジオ風）</option>
+  <option value="loud">音量アップ</option>
 </select>
 
 <!-- 強さスライダー -->
@@ -69,19 +69,19 @@ document.getElementById("audioFile").addEventListener("change", async (e) => {
 // 更新（再加工）
 document.getElementById("updateButton").addEventListener("click", async () => {
   if (!originalBuffer) {
-    alert("まず音声ファイルを読み込んでね！");
+    alert("まずファイルを読み込んで下さい。");
     return;
   }
   const mode = document.getElementById("modeSelect").value;
   const strength = document.getElementById("strength").value;
   processedBuffer = await processAudio(originalBuffer, mode, strength);
-  alert("設定を反映しました！");
+  alert("設定を反映しました。");
 });
 
 // 再生ボタン
 document.getElementById("playButton").addEventListener("click", () => {
   if (!processedBuffer) {
-    alert("まずファイルを読み込んでください！");
+    alert("まずファイルを読み込んでください。");
     return;
   }
 
@@ -97,7 +97,7 @@ document.getElementById("playButton").addEventListener("click", () => {
 // ダウンロードボタン
 document.getElementById("downloadButton").addEventListener("click", () => {
   if (!processedBuffer) {
-    alert("まだ音声がありません！");
+    alert("まだ音声がありません。");
     return;
   }
   const wavBlob = audioBufferToWavBlob(processedBuffer);
@@ -110,7 +110,7 @@ document.getElementById("downloadButton").addEventListener("click", () => {
 // 共有ボタン
 document.getElementById("shareButton").addEventListener("click", async () => {
   if (!processedBuffer) {
-    alert("まだ音声がありません！");
+    alert("まだ音声がありません。");
     return;
   }
 
@@ -120,8 +120,8 @@ document.getElementById("shareButton").addEventListener("click", async () => {
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     await navigator.share({
       files: [file],
-      title: "加工した音をチェック！",
-      text: "音質をカスタムした音声だよ🎶"
+      title: "加工した音をチェック",
+      text: "音質をカスタムした音声です。"
     });
   } else {
     const link = document.createElement("a");
